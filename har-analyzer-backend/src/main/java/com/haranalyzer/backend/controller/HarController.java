@@ -41,8 +41,8 @@ public class HarController {
             // Use the service to analyze the HAR file
             AnalysisResult result = harAnalyzerService.analyzeHar(fileContent);
 
-            // Return the analysis result as JSON
-            // Spring automatically converts the AnalysisResult object to JSON
+            // Return the analysis result as JSON (Spring automatically converts the
+            // AnalysisResult object to JSON)
             return ResponseEntity.ok(result);
 
         } catch (Exception e) {

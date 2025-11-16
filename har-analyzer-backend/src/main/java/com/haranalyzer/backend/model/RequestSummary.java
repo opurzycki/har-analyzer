@@ -4,6 +4,7 @@ public class RequestSummary {
     private String method;
     private String url;
     private int status;
+    private String statusText;
     private double time;
     private long size;
     private String startedDateTime;
@@ -12,10 +13,12 @@ public class RequestSummary {
     public RequestSummary() {
     }
 
-    public RequestSummary(String method, String url, int status, double time, long size, String startedDateTime) {
+    public RequestSummary(String method, String url, int status, String statusText, double time, long size,
+            String startedDateTime) {
         this.method = method;
         this.url = url;
         this.status = status;
+        this.statusText = statusText;
         this.time = time;
         this.size = size;
         this.startedDateTime = startedDateTime;
@@ -46,6 +49,14 @@ public class RequestSummary {
         this.status = status;
     }
 
+    public String getStatusText() {
+        return statusText;
+    }
+
+    public void setStatusText(String statusText) {
+        this.statusText = statusText;
+    }
+
     public double getTime() {
         return time;
     }
@@ -69,4 +80,5 @@ public class RequestSummary {
     public void setStartedDateTime(String startedDateTime) {
         this.startedDateTime = startedDateTime;
     }
+
 }

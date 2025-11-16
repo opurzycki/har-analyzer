@@ -11,9 +11,10 @@ import java.util.List;
 
 /**
  * Service class responsible for parsing and analyzing HAR files.
+ * It tells Spring this is a service component that can be injected into other
+ * classes.
  */
-@Service // Tells Spring this is a service component that can be injected into other
-         // classes
+@Service
 public class HarAnalyzerService {
 
     // ObjectMapper is Jackson's main class for reading/writing JSON
@@ -58,7 +59,8 @@ public class HarAnalyzerService {
 
             // Extract response information
             JsonNode response = entry.path("response");
-            int status = response.path("status").asInt(); // HTTP status code (200, 404, 500, etc.)
+            int status = response.path("status").asInt();
+            String statusText = response.path("statusText").asText();
 
             // Extract timing information
             double time = entry.path("time").asDouble(); // Total request time in milliseconds
@@ -79,19 +81,21 @@ public class HarAnalyzerService {
                         method,
                         url,
                         status,
+                        statusText,
                         time,
                         size,
                         startedDateTime));
             }
 
             // Check if this is a slow request (took longer than 1 second)
-            if (time > SLOW_REQUEST_THRESHOLD) {
+            if ((time > SLOW_REQUEST_THRESHOLD) && (status < 400)) {
                 slowRequests++;
                 // Create a RequestSummary object and add it to the slow requests list
                 slowRequestsList.add(new RequestSummary(
                         method,
                         url,
                         status,
+                        statusText,
                         time,
                         size,
                         startedDateTime));
