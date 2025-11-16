@@ -5,3 +5,7 @@
 
 # OS
 .DS_Storetest.har
+.DS_Store
+**/.DS_Store
+*.har
+!test.har

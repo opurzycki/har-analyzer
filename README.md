@@ -36,10 +36,12 @@ npm run dev
 ## API Example
 
 ```bash
-# Upload a HAR file
+# Upload a HAR file of your choosing
 curl -X POST http://localhost:8080/api/har/upload -F "file=@yourfile.har"
+# Or use a test HAR file
+curl -X POST http://localhost:8080/api/har/upload -F "file=@test.har"
 
-# Returns:
+# Example response:
 {
   "totalRequests": 25,
   "failedRequests": 3,
@@ -59,4 +61,5 @@ Built as a learning project to demonstrate full-stack development skills. Solves
 
 - [ ] File upload UI
 - [ ] Results visualization
+- [ ] Extended data analysis
 - [ ] Filtering and search
