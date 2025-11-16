@@ -53,7 +53,7 @@ curl -X POST http://localhost:8080/api/har/upload -F "file=@yourfile.har"
 
 ## Why This Project?
 
-Built as a learning project to demonstrate full-stack development skills and transition from Technical Support Engineer to Software Developer. Solves a real problem I encounter daily - analyzing HAR files for debugging customer issues.
+Built as a learning project to demonstrate full-stack development skills. Solves a real problem I encounter daily - analyzing HAR files for debugging customer issues.
 
 ## Next Steps
 
