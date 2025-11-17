@@ -63,3 +63,4 @@ Built as a learning project to demonstrate full-stack development skills. Solves
 - [ ] Results visualization
 - [ ] Extended data analysis
 - [ ] Filtering and search
+- [ ] Add Dockerfile to backend and frontend and orchestrate with docker compose
