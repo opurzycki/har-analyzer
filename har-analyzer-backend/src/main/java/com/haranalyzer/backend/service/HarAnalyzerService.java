@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.haranalyzer.backend.model.AnalysisResult;
 import com.haranalyzer.backend.model.RequestSummary;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,6 +23,33 @@ public class HarAnalyzerService {
 
     // Threshold for considering a request "slow" (in milliseconds)
     private static final double SLOW_REQUEST_THRESHOLD = 1000.0;
+
+    /**
+     * Validates, reads, and analyzes a HAR file upload.
+     * This is the main entry point for processing HAR files.
+     * 
+     * @param file The uploaded HAR file
+     * @return AnalysisResult containing summary and detailed analysis
+     * @throws Exception if validation fails or file cannot be parsed
+     */
+    public AnalysisResult processHarFile(MultipartFile file) throws Exception {
+        // Validation: Check if file was uploaded
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("Please upload a HAR file");
+        }
+
+        // Validation: Check file extension
+        String filename = file.getOriginalFilename();
+        if (filename == null || !filename.endsWith(".har")) {
+            throw new IllegalArgumentException("File must be a .har file");
+        }
+
+        // Read file content
+        String fileContent = new String(file.getBytes());
+
+        // Analyze and return results
+        return analyzeHar(fileContent);
+    }
 
     public AnalysisResult analyzeHar(String harContent) throws Exception {
 
