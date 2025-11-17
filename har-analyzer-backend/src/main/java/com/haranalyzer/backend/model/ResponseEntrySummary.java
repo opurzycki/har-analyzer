@@ -1,6 +1,6 @@
 package com.haranalyzer.backend.model;
 
-public class RequestSummary {
+public class ResponseEntrySummary {
     private String method;
     private String url;
     private int status;
@@ -10,10 +10,10 @@ public class RequestSummary {
     private String startedDateTime;
 
     // Constructors
-    public RequestSummary() {
+    public ResponseEntrySummary() {
     }
 
-    public RequestSummary(String method, String url, int status, String statusText, double time, long size,
+    public ResponseEntrySummary(String method, String url, int status, String statusText, double time, long size,
             String startedDateTime) {
         this.method = method;
         this.url = url;

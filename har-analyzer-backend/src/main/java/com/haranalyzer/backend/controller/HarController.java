@@ -19,22 +19,9 @@ public class HarController {
     }
 
     @PostMapping("/upload")
-    public ResponseEntity<?> uploadHar(@RequestParam("file") MultipartFile file) {
-        try {
-            // Delegate all work to the service
-            AnalysisResult result = harAnalyzerService.processHarFile(file);
-
-            // Return success response
-            return ResponseEntity.ok(result);
-
-        } catch (IllegalArgumentException e) {
-            // Handle validation errors (400 Bad Request)
-            return ResponseEntity.badRequest().body(e.getMessage());
-
-        } catch (Exception e) {
-            // Handle other errors (500 Internal Server Error)
-            return ResponseEntity.internalServerError()
-                    .body("Error processing file: " + e.getMessage());
-        }
+    public ResponseEntity<AnalysisResult> uploadHar(@RequestParam("file") MultipartFile file) {
+        AnalysisResult result = harAnalyzerService.processHarFile(file);
+        // TODO: error handling
+        return ResponseEntity.ok(result);
     }
 }

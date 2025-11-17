@@ -8,8 +8,8 @@ public class AnalysisResult {
     private int slowRequests;
     private double totalLoadTime;
     private long totalSize;
-    private List<RequestSummary> failedRequestsList;
-    private List<RequestSummary> slowRequestsList;
+    private List<ResponseEntrySummary> failedRequestsList;
+    private List<ResponseEntrySummary> slowRequestsList;
 
     // Constructors
     public AnalysisResult() {
@@ -17,8 +17,8 @@ public class AnalysisResult {
 
     public AnalysisResult(int totalRequests, int failedRequests, int slowRequests,
             double totalLoadTime, long totalSize,
-            List<RequestSummary> failedRequestsList,
-            List<RequestSummary> slowRequestsList) {
+            List<ResponseEntrySummary> failedRequestsList,
+            List<ResponseEntrySummary> slowRequestsList) {
         this.totalRequests = totalRequests;
         this.failedRequests = failedRequests;
         this.slowRequests = slowRequests;
@@ -69,19 +69,19 @@ public class AnalysisResult {
         this.totalSize = totalSize;
     }
 
-    public List<RequestSummary> getFailedRequestsList() {
+    public List<ResponseEntrySummary> getFailedRequestsList() {
         return failedRequestsList;
     }
 
-    public void setFailedRequestsList(List<RequestSummary> failedRequestsList) {
+    public void setFailedRequestsList(List<ResponseEntrySummary> failedRequestsList) {
         this.failedRequestsList = failedRequestsList;
     }
 
-    public List<RequestSummary> getSlowRequestsList() {
+    public List<ResponseEntrySummary> getSlowRequestsList() {
         return slowRequestsList;
     }
 
-    public void setSlowRequestsList(List<RequestSummary> slowRequestsList) {
+    public void setSlowRequestsList(List<ResponseEntrySummary> slowRequestsList) {
         this.slowRequestsList = slowRequestsList;
     }
 }
