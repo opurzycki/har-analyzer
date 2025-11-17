@@ -31,64 +31,70 @@ public class HarAnalyzerService {
         return analyzeHar(fileContent);
     }
 
-    public AnalysisResult analyzeHar(String harContent) throws Exception {
-        JsonNode rootNode = objectMapper.readTree(harContent);
-        JsonNode entriesNode = rootNode.path("log").path("entries");
-        if (!entriesNode.isArray()) {
-            throw new Exception("Invalid HAR format: 'entries' array not found");
-        }
-
-        int totalRequests = 0;
-        int failedRequests = 0;
-        int slowRequests = 0;
-        double totalLoadTime = 0.0;
-        long totalSize = 0;
-
-        List<RequestSummary> failedRequestsList = new ArrayList<>();
-        List<RequestSummary> slowRequestsList = new ArrayList<>();
-
-        for (JsonNode entry : entriesNode) {
-            totalRequests++;
-
-            JsonNode request = entry.path("request");
-            String method = request.path("method").asText();
-            String url = request.path("url").asText();
-
-            JsonNode response = entry.path("response");
-            int status = response.path("status").asInt();
-            String statusText = response.path("statusText").asText();
-
-            double time = entry.path("time").asDouble();
-            totalLoadTime += time;
-
-            JsonNode sizeNode = response.path("content").path("size");
-            long size = (sizeNode.isMissingNode() || !sizeNode.isNumber() || sizeNode.asLong() < 0) ? 0
-                    : sizeNode.asLong();
-            totalSize += size;
-
-            String startedDateTime = entry.path("startedDateTime").asText();
-
-            if (status >= 400) {
-                failedRequests++;
-                failedRequestsList
-                        .add(createRequestSummary(method, url, status, statusText, time, size, startedDateTime));
+    public AnalysisResult analyzeHar(String harContent) {
+        try {
+            JsonNode rootNode = objectMapper.readTree(harContent);
+            JsonNode entriesNode = rootNode.path("log").path("entries");
+            if (!entriesNode.isArray()) {
+                throw new IllegalArgumentException("Invalid HAR format: 'entries' array not found");
             }
 
-            if ((time > SLOW_REQUEST_THRESHOLD) && (status < 400)) {
-                slowRequests++;
-                slowRequestsList
-                        .add(createRequestSummary(method, url, status, statusText, time, size, startedDateTime));
-            }
-        }
+            int totalRequests = 0;
+            int failedRequests = 0;
+            int slowRequests = 0;
+            double totalLoadTime = 0.0;
+            long totalSize = 0;
 
-        return new AnalysisResult(
-                totalRequests,
-                failedRequests,
-                slowRequests,
-                totalLoadTime,
-                totalSize,
-                failedRequestsList,
-                slowRequestsList);
+            List<RequestSummary> failedRequestsList = new ArrayList<>();
+            List<RequestSummary> slowRequestsList = new ArrayList<>();
+
+            for (JsonNode entry : entriesNode) {
+                totalRequests++;
+
+                JsonNode request = entry.path("request");
+                String method = request.path("method").asText();
+                String url = request.path("url").asText();
+
+                JsonNode response = entry.path("response");
+                int status = response.path("status").asInt();
+                String statusText = response.path("statusText").asText();
+
+                double time = entry.path("time").asDouble();
+                totalLoadTime += time;
+
+                JsonNode sizeNode = response.path("content").path("size");
+                long size = (sizeNode.isMissingNode() || !sizeNode.isNumber() || sizeNode.asLong() < 0) ? 0
+                        : sizeNode.asLong();
+                totalSize += size;
+
+                String startedDateTime = entry.path("startedDateTime").asText();
+
+                if (status >= 400) {
+                    failedRequests++;
+                    failedRequestsList
+                            .add(createRequestSummary(method, url, status, statusText, time, size, startedDateTime));
+                }
+
+                if ((time > SLOW_REQUEST_THRESHOLD) && (status < 400)) {
+                    slowRequests++;
+                    slowRequestsList
+                            .add(createRequestSummary(method, url, status, statusText, time, size, startedDateTime));
+                }
+            }
+
+            return new AnalysisResult(
+                    totalRequests,
+                    failedRequests,
+                    slowRequests,
+                    totalLoadTime,
+                    totalSize,
+                    failedRequestsList,
+                    slowRequestsList);
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to analyze HAR content", e);
+        }
     }
 
     private RequestSummary createRequestSummary(String method, String url, int status, String statusText, double time,
