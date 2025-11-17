@@ -10,127 +10,77 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Service class responsible for parsing and analyzing HAR files.
- * It tells Spring this is a service component that can be injected into other
- * classes.
- */
 @Service
 public class HarAnalyzerService {
 
-    // ObjectMapper is Jackson's main class for reading/writing JSON
     private final ObjectMapper objectMapper = new ObjectMapper();
-
-    // Threshold for considering a request "slow" (in milliseconds)
     private static final double SLOW_REQUEST_THRESHOLD = 1000.0;
 
-    /**
-     * Validates, reads, and analyzes a HAR file upload.
-     * This is the main entry point for processing HAR files.
-     * 
-     * @param file The uploaded HAR file
-     * @return AnalysisResult containing summary and detailed analysis
-     * @throws Exception if validation fails or file cannot be parsed
-     */
     public AnalysisResult processHarFile(MultipartFile file) throws Exception {
-        // Validation: Check if file was uploaded
         if (file.isEmpty()) {
             throw new IllegalArgumentException("Please upload a HAR file");
         }
 
-        // Validation: Check file extension
         String filename = file.getOriginalFilename();
         if (filename == null || !filename.endsWith(".har")) {
             throw new IllegalArgumentException("File must be a .har file");
         }
 
-        // Read file content
         String fileContent = new String(file.getBytes());
 
-        // Analyze and return results
         return analyzeHar(fileContent);
     }
 
     public AnalysisResult analyzeHar(String harContent) throws Exception {
-
-        // Parse the JSON string into a tree structure we can navigate
         JsonNode rootNode = objectMapper.readTree(harContent);
-
-        // HAR files have a structure: { "log": { "entries": [...] } }
-        // Navigate to the "entries" array which contains all HTTP requests
         JsonNode entriesNode = rootNode.path("log").path("entries");
-
-        // Check if entries exist and is actually an array
         if (!entriesNode.isArray()) {
             throw new Exception("Invalid HAR format: 'entries' array not found");
         }
 
-        // Initialize counters and lists for our analysis
         int totalRequests = 0;
         int failedRequests = 0;
         int slowRequests = 0;
         double totalLoadTime = 0.0;
         long totalSize = 0;
 
-        // Lists to hold details of failed and slow requests
         List<RequestSummary> failedRequestsList = new ArrayList<>();
         List<RequestSummary> slowRequestsList = new ArrayList<>();
 
-        // Loop through each entry (HTTP request) in the HAR file
         for (JsonNode entry : entriesNode) {
             totalRequests++;
 
-            // Extract request information
             JsonNode request = entry.path("request");
-            String method = request.path("method").asText(); // GET, POST, etc.
-            String url = request.path("url").asText(); // Full URL
+            String method = request.path("method").asText();
+            String url = request.path("url").asText();
 
-            // Extract response information
             JsonNode response = entry.path("response");
             int status = response.path("status").asInt();
             String statusText = response.path("statusText").asText();
 
-            // Extract timing information
-            double time = entry.path("time").asDouble(); // Total request time in milliseconds
+            double time = entry.path("time").asDouble();
             totalLoadTime += time;
 
-            // Extract size information
-            long size = response.path("content").path("size").asLong(); // Response size in bytes
+            JsonNode sizeNode = response.path("content").path("size");
+            long size = (sizeNode.isMissingNode() || !sizeNode.isNumber() || sizeNode.asLong() < 0) ? 0
+                    : sizeNode.asLong();
             totalSize += size;
 
-            // Extract when the request started (ISO 8601 format)
             String startedDateTime = entry.path("startedDateTime").asText();
 
-            // Check if this is a failed request (HTTP status 400 or higher means error)
             if (status >= 400) {
                 failedRequests++;
-                // Create a RequestSummary object and add it to the failed requests list
-                failedRequestsList.add(new RequestSummary(
-                        method,
-                        url,
-                        status,
-                        statusText,
-                        time,
-                        size,
-                        startedDateTime));
+                failedRequestsList
+                        .add(createRequestSummary(method, url, status, statusText, time, size, startedDateTime));
             }
 
-            // Check if this is a slow request (took longer than 1 second)
             if ((time > SLOW_REQUEST_THRESHOLD) && (status < 400)) {
                 slowRequests++;
-                // Create a RequestSummary object and add it to the slow requests list
-                slowRequestsList.add(new RequestSummary(
-                        method,
-                        url,
-                        status,
-                        statusText,
-                        time,
-                        size,
-                        startedDateTime));
+                slowRequestsList
+                        .add(createRequestSummary(method, url, status, statusText, time, size, startedDateTime));
             }
         }
 
-        // Create and return the analysis result with all the stats we collected
         return new AnalysisResult(
                 totalRequests,
                 failedRequests,
@@ -139,5 +89,10 @@ public class HarAnalyzerService {
                 totalSize,
                 failedRequestsList,
                 slowRequestsList);
+    }
+
+    private RequestSummary createRequestSummary(String method, String url, int status, String statusText, double time,
+            long size, String startedDateTime) {
+        return new RequestSummary(method, url, status, statusText, time, size, startedDateTime);
     }
 }
