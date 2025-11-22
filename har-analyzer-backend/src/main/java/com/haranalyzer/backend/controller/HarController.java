@@ -21,7 +21,6 @@ public class HarController {
     @PostMapping("/upload")
     public ResponseEntity<AnalysisResult> uploadHar(@RequestParam("file") MultipartFile file) {
         AnalysisResult result = harAnalyzerService.processHarFile(file);
-        // TODO: error handling
         return ResponseEntity.ok(result);
     }
 }
