@@ -8,13 +8,14 @@ public class ResponseEntrySummary {
     private double time;
     private long size;
     private String startedDateTime;
+    private String xTraceId;
 
     // Constructors
     public ResponseEntrySummary() {
     }
 
     public ResponseEntrySummary(String method, String url, int status, String statusText, double time, long size,
-            String startedDateTime) {
+            String startedDateTime, String traceId) {
         this.method = method;
         this.url = url;
         this.status = status;
@@ -22,6 +23,7 @@ public class ResponseEntrySummary {
         this.time = time;
         this.size = size;
         this.startedDateTime = startedDateTime;
+        this.xTraceId = traceId;
     }
 
     // Getters and Setters
@@ -79,6 +81,14 @@ public class ResponseEntrySummary {
 
     public void setStartedDateTime(String startedDateTime) {
         this.startedDateTime = startedDateTime;
+    }
+
+    public String getxTraceId() {
+        return xTraceId;
+    }
+
+    public void setxTraceId(String traceId) {
+        this.xTraceId = traceId;
     }
 
 }

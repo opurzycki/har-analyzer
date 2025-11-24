@@ -66,17 +66,28 @@ public class HarHandler {
 
                 String startedDateTime = entry.path("startedDateTime").asText("");
 
+                String xTraceId = "";
+                JsonNode headers = response.path("headers");
+                if (headers.isArray()) {
+                    for (JsonNode header : headers) {
+                        if ("x-trace-id".equalsIgnoreCase(header.path("name").asText(""))) {
+                            xTraceId = header.path("value").asText("");
+                            break;
+                        }
+                    }
+                }
+
                 if (status >= ERROR_STATUS_THRESHOLD) {
                     failedRequests++;
                     failedRequestsList.add(new ResponseEntrySummary(method, url, status, statusText, time, size,
-                            startedDateTime));
+                            startedDateTime, xTraceId));
                     continue; // failed responses are not considered "slow" in our analysis
                 }
 
                 if (time > SLOW_REQUEST_THRESHOLD) {
                     slowRequests++;
                     slowRequestsList.add(new ResponseEntrySummary(method, url, status, statusText, time, size,
-                            startedDateTime));
+                            startedDateTime, xTraceId));
                 }
             }
 

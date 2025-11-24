@@ -6,6 +6,7 @@ export interface ResponseEntrySummary {
     time: number;
     size: number;
     startedDateTime: string;
+    xTraceId: string;
 }
 
 export interface AnalysisResult {
