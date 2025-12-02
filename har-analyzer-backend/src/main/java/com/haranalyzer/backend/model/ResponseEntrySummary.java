@@ -9,13 +9,15 @@ public class ResponseEntrySummary {
     private long size;
     private String startedDateTime;
     private String xTraceId;
+    private String requestBody;
+    private String responseBody;
 
     // Constructors
     public ResponseEntrySummary() {
     }
 
     public ResponseEntrySummary(String method, String url, int status, String statusText, double time, long size,
-            String startedDateTime, String traceId) {
+            String startedDateTime, String traceId, String requestBody, String responseBody) {
         this.method = method;
         this.url = url;
         this.status = status;
@@ -24,6 +26,8 @@ public class ResponseEntrySummary {
         this.size = size;
         this.startedDateTime = startedDateTime;
         this.xTraceId = traceId;
+        this.requestBody = requestBody;
+        this.responseBody = responseBody;
     }
 
     // Getters and Setters
@@ -89,6 +93,22 @@ public class ResponseEntrySummary {
 
     public void setxTraceId(String traceId) {
         this.xTraceId = traceId;
+    }
+
+    public String getRequestBody() {
+        return requestBody;
+    }
+
+    public void setRequestBody(String requestBody) {
+        this.requestBody = requestBody;
+    }
+
+    public String getResponseBody() {
+        return responseBody;
+    }
+
+    public void setResponseBody(String responseBody) {
+        this.responseBody = responseBody;
     }
 
 }

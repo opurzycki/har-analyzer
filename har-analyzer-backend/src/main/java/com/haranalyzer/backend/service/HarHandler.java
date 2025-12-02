@@ -77,17 +77,20 @@ public class HarHandler {
                     }
                 }
 
+                String requestBody = request.path("postData").path("text").asText("");
+                String responseBody = response.path("content").path("text").asText("");
+
                 if (status >= ERROR_STATUS_THRESHOLD) {
                     failedRequests++;
                     failedRequestsList.add(new ResponseEntrySummary(method, url, status, statusText, time, size,
-                            startedDateTime, xTraceId));
+                            startedDateTime, xTraceId, requestBody, responseBody));
                     continue; // failed responses are not considered "slow" in our analysis
                 }
 
                 if (time > SLOW_REQUEST_THRESHOLD) {
                     slowRequests++;
                     slowRequestsList.add(new ResponseEntrySummary(method, url, status, statusText, time, size,
-                            startedDateTime, xTraceId));
+                            startedDateTime, xTraceId, requestBody, responseBody));
                 }
             }
 

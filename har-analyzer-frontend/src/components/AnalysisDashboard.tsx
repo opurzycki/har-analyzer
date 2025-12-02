@@ -149,81 +149,150 @@ function RequestList({ title, requests, type, emptyMessage }: { title: string, r
 
 function RequestItem({ req }: { req: ResponseEntrySummary }) {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [activeTab, setActiveTab] = useState<'Headers' | 'Payload' | 'Preview' | 'Response'>('Headers');
 
-    const formatUrl = (url: string) => {
-        return url.replace(/^(https?:\/\/)/, '');
+    // Format date
+    const formatDate = (dateString: string) => {
+        try {
+            return new Date(dateString).toLocaleString();
+        } catch (e) {
+            return dateString;
+        }
     };
 
     return (
         <div
-            onClick={() => setIsExpanded(!isExpanded)}
             className={cn(
-                "transition-colors group cursor-pointer hover:bg-muted/30",
-                isExpanded ? "p-4" : "p-2"
+                "transition-all border-b border-border/50 last:border-0",
+                isExpanded ? "bg-muted/30" : "hover:bg-muted/30"
             )}
         >
-            <div className="flex flex-col gap-2">
-                <div className="flex items-center justify-between gap-4">
+            {/* Header - Always visible and consistent */}
+            <div
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="flex items-center justify-between gap-4 p-3 cursor-pointer group"
+            >
+                <div className="flex items-center gap-3 min-w-0">
+                    {/* Method Badge */}
+                    <span className={cn(
+                        "text-xs font-bold px-2 py-1 rounded uppercase w-16 text-center shrink-0",
+                        req.method === 'GET' && "bg-green-500/10 text-green-500",
+                        req.method === 'POST' && "bg-blue-500/10 text-blue-500",
+                        req.method === 'PUT' && "bg-purple-500/10 text-purple-500",
+                        req.method === 'DELETE' && "bg-red-500/10 text-red-500",
+                        req.method === 'PATCH' && "bg-orange-500/10 text-orange-500",
+                    )}>
+                        {req.method}
+                    </span>
+
+                    {/* Status and Text */}
                     <div className="flex items-center gap-3 min-w-0">
                         <span className={cn(
-                            "text-xs font-bold px-2 py-1 rounded uppercase w-16 text-center shrink-0",
-                            req.method === 'GET' && "bg-green-500/10 text-green-500",
-                            req.method === 'POST' && "bg-blue-500/10 text-blue-500",
-                            req.method === 'PUT' && "bg-purple-500/10 text-purple-500",
-                            req.method === 'DELETE' && "bg-red-500/10 text-red-500",
-                            req.method === 'PATCH' && "bg-orange-500/10 text-orange-500",
+                            "text-xs font-bold px-2 py-1 rounded-full shrink-0",
+                            req.status >= 400 ? "bg-destructive/10 text-destructive" : "bg-green-500/10 text-green-500"
                         )}>
-                            {req.method}
+                            {req.status}
                         </span>
-                        {isExpanded ? (
-                            <span className="text-sm font-mono text-foreground/90 break-all">
-                                {formatUrl(req.url)}
-                            </span>
-                        ) : (
-                            <div className="flex items-center gap-3 min-w-0">
-                                <span className={cn(
-                                    "text-xs font-bold px-2 py-1 rounded-full shrink-0",
-                                    req.status >= 400 ? "bg-destructive/10 text-destructive" : "bg-green-500/10 text-green-500"
-                                )}>
-                                    {req.status}
-                                </span>
-                                <span className="text-sm text-muted-foreground truncate">
-                                    {req.statusText || (req.status >= 400 ? "Error" : "OK")}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0">
-                        <span className="text-xs text-muted-foreground w-16 text-right">
-                            {Math.round(req.time)}ms
+                        <span className="text-sm text-muted-foreground truncate font-medium">
+                            {req.statusText || (req.status >= 400 ? "Error" : "OK")}
                         </span>
                     </div>
                 </div>
 
-                {isExpanded && (
-                    <div className="pl-[5.25rem] flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                            <span className={cn(
-                                "text-xs font-bold px-2 py-1 rounded-full",
-                                req.status >= 400 ? "bg-destructive/10 text-destructive" : "bg-green-500/10 text-green-500"
-                            )}>
-                                {req.status}
-                            </span>
-                            {req.status >= 400 && (
-                                <p className="text-sm font-bold text-muted-foreground">
-                                    {req.statusText || "No error message available"}
-                                </p>
-                            )}
-                        </div>
-                        {req.xTraceId && (
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <span className="font-semibold">x-trace-id:</span>
-                                <span className="font-mono">{req.xTraceId}</span>
+                {/* Time and Chevron */}
+                <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-xs text-muted-foreground w-16 text-right">
+                        {Math.round(req.time)}ms
+                    </span>
+                </div>
+            </div>
+
+            {/* Expanded Content */}
+            {isExpanded && (
+                <div className="border-t border-border/50">
+                    {/* Tabs */}
+                    <div className="flex items-center px-2 border-b border-border/50 bg-muted/20 overflow-x-auto">
+                        {['Headers', 'Payload', 'Preview', 'Response'].map((tab) => (
+                            <button
+                                key={tab}
+                                onClick={() => setActiveTab(tab as any)}
+                                className={cn(
+                                    "px-4 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap",
+                                    activeTab === tab
+                                        ? "border-primary text-primary"
+                                        : "border-transparent text-muted-foreground hover:text-foreground hover:border-muted-foreground/50"
+                                )}
+                            >
+                                {tab}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Tab Content */}
+                    <div className="p-4 bg-background/50">
+                        {activeTab === 'Headers' && (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-[120px_1fr] gap-2 text-sm">
+                                    <div className="font-semibold text-muted-foreground">Request URL</div>
+                                    <div className="font-mono text-xs break-all select-all">{req.url}</div>
+
+                                    <div className="font-semibold text-muted-foreground">Request Method</div>
+                                    <div className="font-mono text-xs text-foreground">{req.method}</div>
+
+                                    <div className="font-semibold text-muted-foreground">Status Code</div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={cn(
+                                            "inline-block w-2 h-2 rounded-full",
+                                            req.status >= 400 ? "bg-destructive" : "bg-green-500"
+                                        )} />
+                                        <span className="text-xs font-mono">{req.status} {req.statusText}</span>
+                                    </div>
+
+                                    <div className="font-semibold text-muted-foreground">Date</div>
+                                    <div className="text-xs font-mono">{formatDate(req.startedDateTime)}</div>
+
+                                    {req.xTraceId && (
+                                        <>
+                                            <div className="font-semibold text-muted-foreground">x-trace-id</div>
+                                            <div className="font-mono text-xs select-all">{req.xTraceId}</div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'Payload' && (
+                            <div className="text-sm font-mono whitespace-pre-wrap break-all max-h-[400px] overflow-y-auto custom-scrollbar">
+                                {req.requestBody ? req.requestBody : (
+                                    <span className="text-muted-foreground italic">No payload data available.</span>
+                                )}
+                            </div>
+                        )}
+
+                        {activeTab === 'Preview' && (
+                            <div className="text-sm font-mono whitespace-pre-wrap break-all max-h-[400px] overflow-y-auto custom-scrollbar">
+                                {(() => {
+                                    if (!req.responseBody) return <span className="text-muted-foreground italic">Preview not available.</span>;
+                                    try {
+                                        const json = JSON.parse(req.responseBody);
+                                        return JSON.stringify(json, null, 2);
+                                    } catch (e) {
+                                        return req.responseBody;
+                                    }
+                                })()}
+                            </div>
+                        )}
+
+                        {activeTab === 'Response' && (
+                            <div className="text-sm font-mono whitespace-pre-wrap break-all max-h-[400px] overflow-y-auto custom-scrollbar">
+                                {req.responseBody ? req.responseBody : (
+                                    <span className="text-muted-foreground italic">Response body not available.</span>
+                                )}
                             </div>
                         )}
                     </div>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     );
 }
