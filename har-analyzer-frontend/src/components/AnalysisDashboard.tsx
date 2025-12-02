@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import type { AnalysisResult, ResponseEntrySummary } from "../types";
 import { cn } from "../lib/utils";
+import { JsonViewer } from "./JsonViewer";
 
 interface AnalysisDashboardProps {
     result: AnalysisResult;
@@ -262,20 +263,26 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
                         )}
 
                         {activeTab === 'Payload' && (
-                            <div className="text-sm font-mono whitespace-pre-wrap break-all max-h-[400px] overflow-y-auto custom-scrollbar">
-                                {req.requestBody ? req.requestBody : (
-                                    <span className="text-muted-foreground italic">No payload data available.</span>
-                                )}
+                            <div className="text-sm font-mono whitespace-pre-wrap break-all max-h-[400px] overflow-y-auto custom-scrollbar p-2">
+                                {(() => {
+                                    if (!req.requestBody) return <span className="text-muted-foreground italic">No payload data available.</span>;
+                                    try {
+                                        const json = JSON.parse(req.requestBody);
+                                        return <JsonViewer data={json} initialExpanded={true} />;
+                                    } catch (e) {
+                                        return req.requestBody;
+                                    }
+                                })()}
                             </div>
                         )}
 
                         {activeTab === 'Preview' && (
-                            <div className="text-sm font-mono whitespace-pre-wrap break-all max-h-[400px] overflow-y-auto custom-scrollbar">
+                            <div className="text-sm font-mono whitespace-pre-wrap break-all max-h-[400px] overflow-y-auto custom-scrollbar p-2">
                                 {(() => {
                                     if (!req.responseBody) return <span className="text-muted-foreground italic">Preview not available.</span>;
                                     try {
                                         const json = JSON.parse(req.responseBody);
-                                        return JSON.stringify(json, null, 2);
+                                        return <JsonViewer data={json} initialExpanded={true} />;
                                     } catch (e) {
                                         return req.responseBody;
                                     }
@@ -284,7 +291,7 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
                         )}
 
                         {activeTab === 'Response' && (
-                            <div className="text-sm font-mono whitespace-pre-wrap break-all max-h-[400px] overflow-y-auto custom-scrollbar">
+                            <div className="text-sm font-mono whitespace-pre-wrap break-all max-h-[400px] overflow-y-auto custom-scrollbar p-2">
                                 {req.responseBody ? req.responseBody : (
                                     <span className="text-muted-foreground italic">Response body not available.</span>
                                 )}
