@@ -155,7 +155,15 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
     // Format date
     const formatDate = (dateString: string) => {
         try {
-            return new Date(dateString).toLocaleString();
+            return new Date(dateString).toLocaleString('pl-PL', {
+                timeZone: 'UTC',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            }) + ' GMT';
         } catch (e) {
             return dateString;
         }
