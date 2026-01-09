@@ -10,6 +10,7 @@ public class AnalysisResult {
     private long totalSize;
     private List<ResponseEntrySummary> failedRequestsList;
     private List<ResponseEntrySummary> slowRequestsList;
+    private List<ResponseEntrySummary> successRequestsList;
 
     // Constructors
     public AnalysisResult() {
@@ -18,7 +19,8 @@ public class AnalysisResult {
     public AnalysisResult(int totalRequests, int failedRequests, int slowRequests,
             double totalLoadTime, long totalSize,
             List<ResponseEntrySummary> failedRequestsList,
-            List<ResponseEntrySummary> slowRequestsList) {
+            List<ResponseEntrySummary> slowRequestsList,
+            List<ResponseEntrySummary> successRequestsList) {
         this.totalRequests = totalRequests;
         this.failedRequests = failedRequests;
         this.slowRequests = slowRequests;
@@ -26,6 +28,7 @@ public class AnalysisResult {
         this.totalSize = totalSize;
         this.failedRequestsList = failedRequestsList;
         this.slowRequestsList = slowRequestsList;
+        this.successRequestsList = successRequestsList;
     }
 
     // Getters and Setters
@@ -83,5 +86,13 @@ public class AnalysisResult {
 
     public void setSlowRequestsList(List<ResponseEntrySummary> slowRequestsList) {
         this.slowRequestsList = slowRequestsList;
+    }
+
+    public List<ResponseEntrySummary> getSuccessRequestsList() {
+        return successRequestsList;
+    }
+
+    public void setSuccessRequestsList(List<ResponseEntrySummary> successRequestsList) {
+        this.successRequestsList = successRequestsList;
     }
 }

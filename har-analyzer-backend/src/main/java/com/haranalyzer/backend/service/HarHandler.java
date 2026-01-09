@@ -44,6 +44,7 @@ public class HarHandler {
 
             List<ResponseEntrySummary> failedRequestsList = new ArrayList<>();
             List<ResponseEntrySummary> slowRequestsList = new ArrayList<>();
+            List<ResponseEntrySummary> successRequestsList = new ArrayList<>();
 
             for (JsonNode entry : entriesNode) {
                 totalRequests++;
@@ -80,17 +81,18 @@ public class HarHandler {
                 String requestBody = request.path("postData").path("text").asText("");
                 String responseBody = response.path("content").path("text").asText("");
 
+                ResponseEntrySummary summary = new ResponseEntrySummary(method, url, status, statusText, time, size,
+                        startedDateTime, xTraceId, requestBody, responseBody);
+
                 if (status >= ERROR_STATUS_THRESHOLD) {
                     failedRequests++;
-                    failedRequestsList.add(new ResponseEntrySummary(method, url, status, statusText, time, size,
-                            startedDateTime, xTraceId, requestBody, responseBody));
-                    continue; // failed responses are not considered "slow" in our analysis
-                }
-
-                if (time > SLOW_REQUEST_THRESHOLD) {
-                    slowRequests++;
-                    slowRequestsList.add(new ResponseEntrySummary(method, url, status, statusText, time, size,
-                            startedDateTime, xTraceId, requestBody, responseBody));
+                    failedRequestsList.add(summary);
+                } else {
+                    successRequestsList.add(summary);
+                    if (time > SLOW_REQUEST_THRESHOLD) {
+                        slowRequests++;
+                        slowRequestsList.add(summary);
+                    }
                 }
             }
 
@@ -101,7 +103,8 @@ public class HarHandler {
                     totalLoadTime,
                     totalSize,
                     failedRequestsList,
-                    slowRequestsList);
+                    slowRequestsList,
+                    successRequestsList);
         } catch (IllegalArgumentException e) {
             throw e;
         } catch (Exception e) {

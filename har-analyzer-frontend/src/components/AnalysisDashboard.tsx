@@ -5,7 +5,10 @@ import {
     Clock,
     Database,
     Globe,
-    ArrowLeft
+    ArrowLeft,
+    CheckCircle2,
+    Layers,
+    ArrowUpDown
 } from "lucide-react";
 import type { AnalysisResult, ResponseEntrySummary } from "../types";
 import { cn } from "../lib/utils";
@@ -30,6 +33,29 @@ export function AnalysisDashboard({ result, onReset }: AnalysisDashboardProps) {
         return `${(ms / 1000).toFixed(2)}s`;
     };
 
+    const [activeListTab, setActiveListTab] = useState<'all' | 'failed' | 'slow' | 'success'>('all');
+    const [sortConfig, setSortConfig] = useState<{ key: 'time' | 'status' | 'method', direction: 'asc' | 'desc' }>({ key: 'time', direction: 'desc' });
+
+    const toggleSort = (key: 'time' | 'status' | 'method') => {
+        setSortConfig(current => ({
+            key,
+            direction: current.key === key && current.direction === 'desc' ? 'asc' : 'desc'
+        }));
+    };
+
+    const sortRequests = (requests: ResponseEntrySummary[]) => {
+        return [...requests].sort((a, b) => {
+            const modifier = sortConfig.direction === 'asc' ? 1 : -1;
+            if (sortConfig.key === 'time') return (new Date(a.startedDateTime).getTime() - new Date(b.startedDateTime).getTime()) * modifier;
+            if (sortConfig.key === 'status') return (a.status - b.status) * modifier;
+            if (sortConfig.key === 'method') return a.method.localeCompare(b.method) * modifier;
+            return 0;
+        });
+    };
+
+    // Combine all requests for the "All" tab
+    const allRequests = [...result.failedRequestsList, ...(result.successRequestsList || [])];
+
     return (
         <div className="w-full max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
             <div className="flex items-center justify-between">
@@ -50,81 +76,212 @@ export function AnalysisDashboard({ result, onReset }: AnalysisDashboardProps) {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <StatCard
-                    title="Total Requests"
+            {/* Stats Overview */}
+            <div className="flex flex-wrap items-center justify-between gap-4 p-6 rounded-xl border bg-card/50 shadow-sm backdrop-blur-sm">
+                <StatItem
+                    label="Total Requests"
                     value={result.totalRequests}
-                    icon={<Globe className="w-4 h-4" />}
-                    className="bg-blue-500/10 text-blue-500 border-blue-500/20"
+                    icon={<Globe className="w-4 h-4 text-blue-500" />}
                 />
-                <StatCard
-                    title="Failed Requests"
+                <div className="w-px h-8 bg-border hidden lg:block" />
+                <StatItem
+                    label="Failed Requests"
                     value={result.failedRequests}
-                    icon={<AlertTriangle className="w-4 h-4" />}
-                    className={cn(
-                        result.failedRequests > 0 ? "bg-red-500/10 text-red-500 border-red-500/20" : "bg-muted/50 text-muted-foreground"
-                    )}
+                    icon={<AlertTriangle className="w-4 h-4 text-destructive" />}
+                    highlight={result.failedRequests > 0 ? "error" : undefined}
                 />
-                <StatCard
-                    title="Slow Requests"
+                <div className="w-px h-8 bg-border hidden lg:block" />
+                <StatItem
+                    label="Slow Requests"
                     value={result.slowRequests}
-                    icon={<Clock className="w-4 h-4" />}
-                    className={cn(
-                        result.slowRequests > 0 ? "bg-orange-500/10 text-orange-500 border-orange-500/20" : "bg-muted/50 text-muted-foreground"
-                    )}
+                    icon={<Clock className="w-4 h-4 text-orange-500" />}
+                    highlight={result.slowRequests > 0 ? "warning" : undefined}
                 />
-                <StatCard
-                    title="Total Load Time"
+                <div className="w-px h-8 bg-border hidden lg:block" />
+                <StatItem
+                    label="Total Load Time"
                     value={formatTime(result.totalLoadTime)}
-                    icon={<BarChart3 className="w-4 h-4" />}
-                    className="bg-purple-500/10 text-purple-500 border-purple-500/20"
+                    icon={<BarChart3 className="w-4 h-4 text-purple-500" />}
                 />
-                <StatCard
-                    title="Total Size"
+                <div className="w-px h-8 bg-border hidden lg:block" />
+                <StatItem
+                    label="Total Size"
                     value={formatBytes(result.totalSize)}
-                    icon={<Database className="w-4 h-4" />}
-                    className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                    icon={<Database className="w-4 h-4 text-emerald-500" />}
                 />
             </div>
 
-            <div className="flex flex-col gap-8">
-                {/* Failed Requests List */}
-                <RequestList
-                    title="Failed Requests"
-                    requests={result.failedRequestsList}
-                    type="error"
-                    emptyMessage="No failed requests found. Great job!"
-                />
+            <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-border/50 pb-2">
+                    <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto no-scrollbar">
+                        <button
+                            onClick={() => setActiveListTab('all')}
+                            className={cn(
+                                "px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap",
+                                activeListTab === 'all'
+                                    ? "border-primary text-primary"
+                                    : "border-transparent text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            <Layers className="w-4 h-4" />
+                            All Requests
+                            <span className="bg-primary/10 text-primary text-xs px-2 py-0.5 rounded-full">
+                                {result.totalRequests}
+                            </span>
+                        </button>
+                        <button
+                            onClick={() => setActiveListTab('failed')}
+                            className={cn(
+                                "px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap",
+                                activeListTab === 'failed'
+                                    ? "border-destructive text-destructive"
+                                    : "border-transparent text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            <AlertTriangle className="w-4 h-4" />
+                            Failed
+                            <span className="bg-destructive/10 text-destructive text-xs px-2 py-0.5 rounded-full">
+                                {result.failedRequests}
+                            </span>
+                        </button>
+                        <button
+                            onClick={() => setActiveListTab('slow')}
+                            className={cn(
+                                "px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap",
+                                activeListTab === 'slow'
+                                    ? "border-orange-500 text-orange-500"
+                                    : "border-transparent text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            <Clock className="w-4 h-4" />
+                            Slow
+                            <span className="bg-orange-500/10 text-orange-500 text-xs px-2 py-0.5 rounded-full">
+                                {result.slowRequests}
+                            </span>
+                        </button>
+                        <button
+                            onClick={() => setActiveListTab('success')}
+                            className={cn(
+                                "px-4 py-2 text-sm font-medium border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap",
+                                activeListTab === 'success'
+                                    ? "border-green-500 text-green-500"
+                                    : "border-transparent text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            <CheckCircle2 className="w-4 h-4" />
+                            OK
+                            <span className="bg-green-500/10 text-green-500 text-xs px-2 py-0.5 rounded-full">
+                                {result.successRequestsList?.length || 0}
+                            </span>
+                        </button>
+                    </div>
 
-                {/* Slow Requests List */}
-                <RequestList
-                    title="Slow Requests (>1s)"
-                    requests={result.slowRequestsList}
-                    type="warning"
-                    emptyMessage="No slow requests found. Performance is optimal!"
-                />
+                    <div className="flex items-center gap-2 text-xs bg-muted/50 p-1 rounded-lg shrink-0">
+                        <span className="px-2 text-muted-foreground font-medium">Sort by:</span>
+                        {['time', 'status', 'method'].map((key) => (
+                            <button
+                                key={key}
+                                onClick={() => toggleSort(key as any)}
+                                className={cn(
+                                    "px-3 py-1.5 rounded-md transition-all flex items-center gap-1.5 capitalize font-medium",
+                                    sortConfig.key === key
+                                        ? "bg-background shadow text-foreground"
+                                        : "hover:bg-background/50 text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {key}
+                                {sortConfig.key === key && (
+                                    <ArrowUpDown className={cn(
+                                        "w-3 h-3 transition-transform",
+                                        sortConfig.direction === 'desc' && "rotate-180"
+                                    )} />
+                                )}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="min-h-[400px]">
+                    {activeListTab === 'all' && (
+                        <RequestList
+                            title="All Requests"
+                            requests={sortRequests(allRequests)}
+                            type="all"
+                            emptyMessage="No requests found."
+                        />
+                    )}
+
+                    {activeListTab === 'failed' && (
+                        <RequestList
+                            title="Failed Requests"
+                            requests={sortRequests(result.failedRequestsList)}
+                            type="error"
+                            emptyMessage="No failed requests found. Great job!"
+                        />
+                    )}
+
+                    {activeListTab === 'slow' && (
+                        <RequestList
+                            title="Slow Requests (>1s)"
+                            requests={sortRequests(result.slowRequestsList)}
+                            type="warning"
+                            emptyMessage="No slow requests found. Performance is optimal!"
+                        />
+                    )}
+
+                    {activeListTab === 'success' && (
+                        <RequestList
+                            title="OK Requests"
+                            requests={sortRequests(result.successRequestsList || [])}
+                            type="success"
+                            emptyMessage="No successful requests found."
+                        />
+                    )}
+                </div>
             </div>
         </div>
     );
 }
 
-function StatCard({ title, value, icon, className }: { title: string, value: string | number, icon: React.ReactNode, className?: string }) {
+function StatItem({ label, value, icon, highlight }: { label: string, value: string | number, icon: React.ReactNode, highlight?: 'error' | 'warning' }) {
     return (
-        <div className={cn("p-6 rounded-2xl border flex flex-col gap-2 transition-all hover:scale-105", className)}>
-            <div className="flex items-center justify-between opacity-80">
-                <span className="text-xs font-medium uppercase tracking-wider">{title}</span>
+        <div className="flex items-center gap-4 min-w-[140px]">
+            <div className={cn(
+                "p-2.5 rounded-lg shrink-0 transition-colors",
+                highlight === 'error' ? "bg-destructive/10" :
+                    highlight === 'warning' ? "bg-orange-500/10" :
+                        "bg-muted"
+            )}>
                 {icon}
             </div>
-            <div className="text-2xl font-bold tracking-tight">{value}</div>
+            <div className="flex flex-col">
+                <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">{label}</span>
+                <span className={cn(
+                    "text-xl font-bold tabular-nums tracking-tight",
+                    highlight === 'error' && "text-destructive",
+                    highlight === 'warning' && "text-orange-500"
+                )}>
+                    {value}
+                </span>
+            </div>
         </div>
     );
 }
 
-function RequestList({ title, requests, type, emptyMessage }: { title: string, requests: ResponseEntrySummary[], type: 'error' | 'warning', emptyMessage: string }) {
+function RequestList({ title, requests, type, emptyMessage }: { title: string, requests: ResponseEntrySummary[], type: 'all' | 'error' | 'warning' | 'success', emptyMessage: string }) {
+    const getIcon = () => {
+        switch (type) {
+            case 'all': return <Layers className="w-5 h-5 text-primary" />;
+            case 'error': return <AlertTriangle className="w-5 h-5 text-destructive" />;
+            case 'warning': return <Clock className="w-5 h-5 text-orange-500" />;
+            case 'success': return <CheckCircle2 className="w-5 h-5 text-green-500" />;
+        }
+    };
+
     return (
         <div className="space-y-4 w-full">
             <h3 className="text-lg font-semibold flex items-center gap-2">
-                {type === 'error' ? <AlertTriangle className="w-5 h-5 text-destructive" /> : <Clock className="w-5 h-5 text-orange-500" />}
+                {getIcon()}
                 {title}
                 <span className="text-xs font-normal text-muted-foreground ml-auto bg-muted px-2 py-1 rounded-full">
                     {requests.length} items
@@ -169,6 +326,20 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
         }
     };
 
+    // Format time only (HH:MM:SS)
+    const formatClockTime = (dateString: string) => {
+        try {
+            return new Date(dateString).toLocaleTimeString('pl-PL', {
+                timeZone: 'UTC',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
+        } catch (e) {
+            return "";
+        }
+    };
+
     return (
         <div
             className={cn(
@@ -210,6 +381,10 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
 
                 {/* Time and Chevron */}
                 <div className="flex items-center gap-3 shrink-0">
+                    <span className="text-xs text-muted-foreground/70 font-mono hidden sm:inline-block">
+                        {formatClockTime(req.startedDateTime)}
+                    </span>
+                    <span className="w-px h-3 bg-border hidden sm:block" />
                     <span className="text-xs text-muted-foreground w-16 text-right">
                         {Math.round(req.time)}ms
                     </span>

@@ -19,4 +19,5 @@ export interface AnalysisResult {
     totalSize: number;
     failedRequestsList: ResponseEntrySummary[];
     slowRequestsList: ResponseEntrySummary[];
+    successRequestsList: ResponseEntrySummary[];
 }
