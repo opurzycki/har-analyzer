@@ -68,12 +68,15 @@ public class HarHandler {
                 String startedDateTime = entry.path("startedDateTime").asText("");
 
                 String xTraceId = "";
+                String externalTraceId = "";
                 JsonNode headers = response.path("headers");
                 if (headers.isArray()) {
                     for (JsonNode header : headers) {
-                        if ("x-trace-id".equalsIgnoreCase(header.path("name").asText(""))) {
+                        String headerName = header.path("name").asText("");
+                        if ("x-trace-id".equalsIgnoreCase(headerName)) {
                             xTraceId = header.path("value").asText("");
-                            break;
+                        } else if ("external-trace-id".equalsIgnoreCase(headerName)) {
+                            externalTraceId = header.path("value").asText("");
                         }
                     }
                 }
@@ -82,7 +85,7 @@ public class HarHandler {
                 String responseBody = response.path("content").path("text").asText("");
 
                 ResponseEntrySummary summary = new ResponseEntrySummary(method, url, status, statusText, time, size,
-                        startedDateTime, xTraceId, requestBody, responseBody);
+                        startedDateTime, xTraceId, externalTraceId, requestBody, responseBody);
 
                 if (status >= ERROR_STATUS_THRESHOLD) {
                     failedRequests++;

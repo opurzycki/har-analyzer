@@ -7,6 +7,7 @@ export interface ResponseEntrySummary {
     size: number;
     startedDateTime: string;
     xTraceId: string;
+    externalTraceId: string;
     requestBody?: string;
     responseBody?: string;
 }

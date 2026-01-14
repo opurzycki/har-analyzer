@@ -8,7 +8,8 @@ import {
     ArrowLeft,
     CheckCircle2,
     Layers,
-    ArrowUpDown
+    ArrowUpDown,
+    MessageCircleQuestion
 } from "lucide-react";
 import type { AnalysisResult, ResponseEntrySummary } from "../types";
 import { cn } from "../lib/utils";
@@ -340,6 +341,66 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
         }
     };
 
+    // Format request data for Glean
+    const formatGleanMessage = () => {
+        const sections: string[] = [];
+
+        sections.push('Analyze the following error from the HAR file:');
+        sections.push('');
+        sections.push('## Method');
+        sections.push(req.method);
+        sections.push('');
+        sections.push('## Error Code / Error Message');
+        sections.push(`${req.status} ${req.statusText || 'Error'}`);
+        sections.push('');
+        sections.push('## URL');
+        sections.push(req.url);
+        sections.push('');
+        sections.push('## Request Date/Time');
+        sections.push(formatDate(req.startedDateTime));
+        sections.push('');
+
+        sections.push('## Request Duration');
+        sections.push(`${Math.round(req.time)}ms`);
+        sections.push('');
+
+        if (req.xTraceId) {
+            sections.push('## x-trace-id');
+            sections.push(req.xTraceId);
+            sections.push('');
+        }
+
+        if (req.externalTraceId) {
+            sections.push('## external-trace-id');
+            sections.push(req.externalTraceId);
+            sections.push('');
+        }
+
+        sections.push('## Payload (Request Body)');
+        if (req.requestBody) {
+            try {
+                const json = JSON.parse(req.requestBody);
+                sections.push('```json');
+                sections.push(JSON.stringify(json, null, 2));
+                sections.push('```');
+            } catch {
+                sections.push(req.requestBody);
+            }
+        } else {
+            sections.push('No payload data available.');
+        }
+
+        return sections.join('\n');
+    };
+
+    // Handle Ask Glean button click
+    const handleAskGlean = (e: React.MouseEvent) => {
+        e.stopPropagation(); // Prevent expanding the row
+        const message = formatGleanMessage();
+        const gleanUrl = `https://app.glean.com/chat?chatAgent=DEFAULT&message=${encodeURIComponent(message)}`;
+        window.open(gleanUrl, '_blank');
+    };
+
     return (
         <div
             className={cn(
@@ -379,8 +440,22 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
                     </div>
                 </div>
 
-                {/* Time and Chevron */}
+                {/* Ask Glean button, Time, and Chevron */}
                 <div className="flex items-center gap-3 shrink-0">
+                    {/* Ask Glean Button - Only for failed requests */}
+                    {req.status >= 400 && (
+                        <>
+                            <button
+                                onClick={handleAskGlean}
+                                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                                title="Ask Glean about this error"
+                            >
+                                <MessageCircleQuestion className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Ask Glean</span>
+                            </button>
+                            <span className="w-px h-3 bg-border" />
+                        </>
+                    )}
                     <span className="text-xs text-muted-foreground/70 font-mono hidden sm:inline-block">
                         {formatClockTime(req.startedDateTime)}
                     </span>
@@ -416,7 +491,7 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
                     <div className="p-4 bg-background/50">
                         {activeTab === 'Headers' && (
                             <div className="space-y-4">
-                                <div className="grid grid-cols-[120px_1fr] gap-2 text-sm">
+                                <div className="grid grid-cols-[120px_1fr] gap-2 text-sm items-baseline">
                                     <div className="font-semibold text-muted-foreground">Request URL</div>
                                     <div className="font-mono text-xs break-all select-all">{req.url}</div>
 
@@ -439,6 +514,12 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
                                         <>
                                             <div className="font-semibold text-muted-foreground">x-trace-id</div>
                                             <div className="font-mono text-xs select-all">{req.xTraceId}</div>
+                                        </>
+                                    )}
+                                    {req.externalTraceId && (
+                                        <>
+                                            <div className="font-semibold text-muted-foreground">external-trace-id</div>
+                                            <div className="font-mono text-xs select-all">{req.externalTraceId}</div>
                                         </>
                                     )}
                                 </div>

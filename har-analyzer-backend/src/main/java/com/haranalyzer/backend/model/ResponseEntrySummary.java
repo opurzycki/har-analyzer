@@ -9,6 +9,7 @@ public class ResponseEntrySummary {
     private long size;
     private String startedDateTime;
     private String xTraceId;
+    private String externalTraceId;
     private String requestBody;
     private String responseBody;
 
@@ -17,7 +18,7 @@ public class ResponseEntrySummary {
     }
 
     public ResponseEntrySummary(String method, String url, int status, String statusText, double time, long size,
-            String startedDateTime, String traceId, String requestBody, String responseBody) {
+            String startedDateTime, String xTraceId, String externalTraceId, String requestBody, String responseBody) {
         this.method = method;
         this.url = url;
         this.status = status;
@@ -25,7 +26,8 @@ public class ResponseEntrySummary {
         this.time = time;
         this.size = size;
         this.startedDateTime = startedDateTime;
-        this.xTraceId = traceId;
+        this.xTraceId = xTraceId;
+        this.externalTraceId = externalTraceId;
         this.requestBody = requestBody;
         this.responseBody = responseBody;
     }
@@ -93,6 +95,14 @@ public class ResponseEntrySummary {
 
     public void setxTraceId(String traceId) {
         this.xTraceId = traceId;
+    }
+
+    public String getExternalTraceId() {
+        return externalTraceId;
+    }
+
+    public void setExternalTraceId(String externalTraceId) {
+        this.externalTraceId = externalTraceId;
     }
 
     public String getRequestBody() {
