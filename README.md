@@ -2,14 +2,14 @@
 
 A tool for analyzing HTTP Archive (HAR) files to identify failed requests and performance issues.
 
-> **⚠️ Work in Progress** - Backend complete, frontend UI in progress.
-
 ## What It Does
 
 Upload a HAR file (exported from browser DevTools) and get instant analysis:
-- Failed HTTP requests (4xx/5xx errors)
-- Slow requests (over 1 second)
-- Performance statistics
+- **Interactive Dashboard**: Visual overview of total requests, failures, slow requests, and data usage.
+- **Detailed Inspection**: Drill down into requests to view Headers, Payload, Response, and Timing.
+- **AI Integration**: "Ask Glean" button to automatically analyze errors using your internal knowledge base.
+- **Jira Support**: Built-in template for quickly creating standardized bug tickets.
+- **Trace Analysis**: Automatic extraction and display of `x-trace-id` and `external-trace-id`.
 
 ## Tech Stack
 
@@ -59,8 +59,8 @@ Built as a learning project to demonstrate full-stack development skills. Solves
 
 ## Next Steps
 
-- [ ] File upload UI
-- [ ] Results visualization
-- [ ] Extended data analysis
-- [ ] Filtering and search
+- [x] File upload UI
+- [x] Results visualization
+- [x] Extended data analysis
+- [x] Filtering and sorting
 - [ ] Add Dockerfile to backend and frontend and orchestrate with docker compose
