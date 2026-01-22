@@ -345,7 +345,7 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
     const formatGleanMessage = () => {
         const sections: string[] = [];
 
-        sections.push('Analyze the following error from the HAR file:');
+        sections.push('Analyze the following error from the HAR file. Do not analyze it as a typical API request, look at is as a SmartRecruiters UI feature error. If possible, create a list of few simple checks that could be done by the Support Agent or the customer to resolve the issue. If not sure always suggest opening a Jira ticket.');
         sections.push('');
         sections.push('## Method');
         sections.push(req.method);
@@ -448,7 +448,7 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
                             <button
                                 onClick={handleAskGlean}
                                 className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
-                                title="Ask Glean about this error"
+                                title="Ask Glean about this error. This is an experimental feature - always double check the results."
                             >
                                 <MessageCircleQuestion className="w-3.5 h-3.5" />
                                 <span className="hidden sm:inline">Ask Glean</span>
@@ -510,12 +510,10 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
                                     <div className="font-semibold text-muted-foreground">Date</div>
                                     <div className="text-xs font-mono">{formatDate(req.startedDateTime)}</div>
 
-                                    {req.xTraceId && (
-                                        <>
-                                            <div className="font-semibold text-muted-foreground">x-trace-id</div>
-                                            <div className="font-mono text-xs select-all">{req.xTraceId}</div>
-                                        </>
-                                    )}
+                                    <div className="font-semibold text-muted-foreground">x-trace-id</div>
+                                    <div className="font-mono text-xs select-all">
+                                        {req.xTraceId || <span className="text-muted-foreground italic">not available</span>}
+                                    </div>
                                     {req.externalTraceId && (
                                         <>
                                             <div className="font-semibold text-muted-foreground">external-trace-id</div>
