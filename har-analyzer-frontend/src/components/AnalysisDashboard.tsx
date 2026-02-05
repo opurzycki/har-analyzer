@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
     BarChart3,
     AlertTriangle,
@@ -9,11 +9,16 @@ import {
     CheckCircle2,
     Layers,
     ArrowUpDown,
-    MessageCircleQuestion
+    ChevronUp,
+    ChevronDown,
+    MessageCircleQuestion,
+    Search
 } from "lucide-react";
 import type { AnalysisResult, ResponseEntrySummary } from "../types";
 import { cn } from "../lib/utils";
 import { JsonViewer } from "./JsonViewer";
+import { HighlightText } from "./HighlightText";
+import { useEffect, useRef } from "react";
 
 interface AnalysisDashboardProps {
     result: AnalysisResult;
@@ -21,6 +26,9 @@ interface AnalysisDashboardProps {
 }
 
 export function AnalysisDashboard({ result, onReset }: AnalysisDashboardProps) {
+    // Combine all requests for the "All" tab - Defined early for use in memo
+    const allRequests = useMemo(() => [...result.failedRequestsList, ...(result.successRequestsList || [])], [result]);
+
     const formatBytes = (bytes: number) => {
         if (bytes === 0) return '0 Bytes';
         const k = 1024;
@@ -44,6 +52,148 @@ export function AnalysisDashboard({ result, onReset }: AnalysisDashboardProps) {
         }));
     };
 
+    // State for search matches
+    interface SearchMatch {
+        reqId: number; // Index in the filtered list
+        location: 'url' | 'method' | 'status' | 'header' | 'payload' | 'response' | 'trace';
+        path?: string; // For JSON paths or Header names
+        value: string; // The matched value
+    }
+
+    const [searchQuery, setSearchQuery] = useState("");
+    const [searchMatches, setSearchMatches] = useState<SearchMatch[]>([]);
+    const [currentMatchIndex, setCurrentMatchIndex] = useState(-1);
+
+    // Debounced search query
+    const [debouncedQuery, setDebouncedQuery] = useState("");
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedQuery(searchQuery);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    // Helper to find all matches in JSON
+    const findMatchesInJson = (data: any, path: string = ""): { path: string, value: string }[] => {
+        let matches: { path: string, value: string }[] = [];
+        if (!data) return matches;
+
+        const query = debouncedQuery.toLowerCase();
+
+        if (typeof data === 'object' && data !== null) {
+            Object.entries(data).forEach(([key, value]) => {
+                const currentPath = path ? `${path}.${key}` : key;
+
+                // Check key
+                if (key.toLowerCase().includes(query)) {
+                    matches.push({ path: currentPath, value: key });
+                }
+
+                // Check value or recurse
+                if (typeof value === 'object' && value !== null) {
+                    matches = [...matches, ...findMatchesInJson(value, currentPath)];
+                } else if (String(value).toLowerCase().includes(query)) {
+                    matches.push({ path: currentPath, value: String(value) });
+                }
+            });
+        }
+        return matches;
+    };
+
+    // Filter requests and calculate matches
+    const filteredRequests = useMemo(() => {
+        if (!debouncedQuery) {
+            setSearchMatches([]);
+            setCurrentMatchIndex(-1);
+            return allRequests;
+        }
+
+        const query = debouncedQuery.toLowerCase();
+        let newMatches: SearchMatch[] = [];
+
+        const filtered = allRequests.filter((req, index) => {
+            let hasMatch = false;
+            const reqId = index;
+
+            // Simple fields
+            if (req.url.toLowerCase().includes(query)) {
+                newMatches.push({ reqId, location: 'url', value: req.url });
+                hasMatch = true;
+            }
+            if (req.method.toLowerCase().includes(query)) {
+                newMatches.push({ reqId, location: 'method', value: req.method });
+                hasMatch = true;
+            }
+            if (req.status.toString().includes(query) || (req.statusText && req.statusText.toLowerCase().includes(query))) {
+                newMatches.push({ reqId, location: 'status', value: `${req.status} ${req.statusText}` });
+                hasMatch = true;
+            }
+            if (req.xTraceId && req.xTraceId.toLowerCase().includes(query)) {
+                newMatches.push({ reqId, location: 'trace', value: req.xTraceId });
+                hasMatch = true;
+            }
+            // Headers
+            if (req.requestHeaders) {
+                req.requestHeaders.forEach(h => {
+                    if (h.name.toLowerCase().includes(query) || h.value.toLowerCase().includes(query)) {
+                        newMatches.push({ reqId, location: 'header', path: h.name, value: h.value });
+                        hasMatch = true;
+                    }
+                });
+            }
+            if (req.responseHeaders) {
+                req.responseHeaders.forEach(h => {
+                    if (h.name.toLowerCase().includes(query) || h.value.toLowerCase().includes(query)) {
+                        newMatches.push({ reqId, location: 'header', path: h.name, value: h.value });
+                        hasMatch = true;
+                    }
+                });
+            }
+
+            // JSON Bodies
+            if (req.requestBody) {
+                try {
+                    const json = JSON.parse(req.requestBody);
+                    const jsonMatches = findMatchesInJson(json);
+                    if (jsonMatches.length > 0) {
+                        jsonMatches.forEach(m => newMatches.push({ reqId, location: 'payload', path: m.path, value: m.value }));
+                        hasMatch = true;
+                    }
+                } catch {
+                    if (req.requestBody.toLowerCase().includes(query)) {
+                        newMatches.push({ reqId, location: 'payload', value: req.requestBody });
+                        hasMatch = true;
+                    }
+                }
+            }
+            if (req.responseBody) {
+                try {
+                    const json = JSON.parse(req.responseBody);
+                    const jsonMatches = findMatchesInJson(json);
+                    if (jsonMatches.length > 0) {
+                        jsonMatches.forEach(m => newMatches.push({ reqId, location: 'response', path: m.path, value: m.value }));
+                        hasMatch = true;
+                    }
+                } catch {
+                    if (req.responseBody.toLowerCase().includes(query)) {
+                        newMatches.push({ reqId, location: 'response', value: req.responseBody });
+                        hasMatch = true;
+                    }
+                }
+            }
+
+            return hasMatch;
+        });
+
+        // Map original indices to filtered indices for matches if we were strictly filtering logic
+        // But here we are filtering ALL requests then showing matches valid for the visible set.
+        // Actually, if we filter the list, the matches indices must align with the FILTERED list.
+        // Let's re-run match finding on just the filtered list to keep indices aligned simpler.
+
+        // Revised approach: First filter, then find matches on the filtered set.
+        return filtered;
+    }, [debouncedQuery, allRequests]);
+
     const sortRequests = (requests: ResponseEntrySummary[]) => {
         return [...requests].sort((a, b) => {
             const modifier = sortConfig.direction === 'asc' ? 1 : -1;
@@ -54,8 +204,67 @@ export function AnalysisDashboard({ result, onReset }: AnalysisDashboardProps) {
         });
     };
 
-    // Combine all requests for the "All" tab
-    const allRequests = [...result.failedRequestsList, ...(result.successRequestsList || [])];
+    // We'll calculate matches on the final sorted & filtered list to ensure navigation works visually 1-to-1
+    const processedRequests = useMemo(() => {
+        return sortRequests(filteredRequests);
+    }, [filteredRequests, sortConfig]);
+
+    useEffect(() => {
+        if (!debouncedQuery) {
+            setSearchMatches([]);
+            setCurrentMatchIndex(-1);
+            return;
+        }
+
+        const query = debouncedQuery.toLowerCase();
+        let newMatches: SearchMatch[] = [];
+
+        processedRequests.forEach((req, index) => {
+            // Simple fields
+            if (req.url.toLowerCase().includes(query)) newMatches.push({ reqId: index, location: 'url', value: req.url });
+            if (req.method.toLowerCase().includes(query)) newMatches.push({ reqId: index, location: 'method', value: req.method });
+            if (req.status.toString().includes(query) || (req.statusText && req.statusText.toLowerCase().includes(query)))
+                newMatches.push({ reqId: index, location: 'status', value: `${req.status}` });
+            if (req.xTraceId && req.xTraceId.toLowerCase().includes(query)) newMatches.push({ reqId: index, location: 'trace', value: req.xTraceId });
+
+            // Headers
+            req.requestHeaders?.forEach(h => {
+                if (h.name.toLowerCase().includes(query) || h.value.toLowerCase().includes(query))
+                    newMatches.push({ reqId: index, location: 'header', path: `req-${h.name}`, value: h.value });
+            });
+            req.responseHeaders?.forEach(h => {
+                if (h.name.toLowerCase().includes(query) || h.value.toLowerCase().includes(query))
+                    newMatches.push({ reqId: index, location: 'header', path: `res-${h.name}`, value: h.value });
+            });
+
+            // Bodies
+            const checkBody = (body: string | undefined, loc: 'payload' | 'response') => {
+                if (!body) return;
+                try {
+                    const json = JSON.parse(body);
+                    const jsonMatches = findMatchesInJson(json);
+                    jsonMatches.forEach(m => newMatches.push({ reqId: index, location: loc, path: m.path, value: m.value }));
+                } catch {
+                    if (body.toLowerCase().includes(query)) newMatches.push({ reqId: index, location: loc, value: body });
+                }
+            };
+            checkBody(req.requestBody, 'payload');
+            checkBody(req.responseBody, 'response');
+        });
+
+        setSearchMatches(newMatches);
+        setCurrentMatchIndex(newMatches.length > 0 ? 0 : -1);
+
+    }, [debouncedQuery, processedRequests]);
+
+    const navigateMatch = (direction: 'next' | 'prev') => {
+        if (searchMatches.length === 0) return;
+        if (direction === 'next') {
+            setCurrentMatchIndex(prev => (prev + 1) % searchMatches.length);
+        } else {
+            setCurrentMatchIndex(prev => (prev - 1 + searchMatches.length) % searchMatches.length);
+        }
+    };
 
     return (
         <div className="w-full max-w-6xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -110,6 +319,35 @@ export function AnalysisDashboard({ result, onReset }: AnalysisDashboardProps) {
                     value={formatBytes(result.totalSize)}
                     icon={<Database className="w-4 h-4 text-emerald-500" />}
                 />
+            </div>
+
+            {/* Search Bar */}
+            <div className="flex items-center gap-2 relative">
+                <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                    <input
+                        type="text"
+                        placeholder="Search requests..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="w-full pl-9 pr-4 py-2 rounded-lg border bg-card/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
+                    />
+                </div>
+
+                {searchMatches.length > 0 && (
+                    <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 shrink-0">
+                        <span className="text-xs text-muted-foreground px-2 font-mono whitespace-nowrap">
+                            {currentMatchIndex + 1} of {searchMatches.length}
+                        </span>
+                        <div className="w-px h-4 bg-border mx-1" />
+                        <button onClick={() => navigateMatch('prev')} className="p-1 hover:bg-background rounded-md text-foreground transition-colors">
+                            <ChevronUp className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => navigateMatch('next')} className="p-1 hover:bg-background rounded-md text-foreground transition-colors">
+                            <ChevronDown className="w-4 h-4" />
+                        </button>
+                    </div>
+                )}
             </div>
 
             <div className="space-y-6">
@@ -203,41 +441,14 @@ export function AnalysisDashboard({ result, onReset }: AnalysisDashboardProps) {
                 </div>
 
                 <div className="min-h-[400px]">
-                    {activeListTab === 'all' && (
-                        <RequestList
-                            title="All Requests"
-                            requests={sortRequests(allRequests)}
-                            type="all"
-                            emptyMessage="No requests found."
-                        />
-                    )}
-
-                    {activeListTab === 'failed' && (
-                        <RequestList
-                            title="Failed Requests"
-                            requests={sortRequests(result.failedRequestsList)}
-                            type="error"
-                            emptyMessage="No failed requests found. Great job!"
-                        />
-                    )}
-
-                    {activeListTab === 'slow' && (
-                        <RequestList
-                            title="Slow Requests (>1s)"
-                            requests={sortRequests(result.slowRequestsList)}
-                            type="warning"
-                            emptyMessage="No slow requests found. Performance is optimal!"
-                        />
-                    )}
-
-                    {activeListTab === 'success' && (
-                        <RequestList
-                            title="OK Requests"
-                            requests={sortRequests(result.successRequestsList || [])}
-                            type="success"
-                            emptyMessage="No successful requests found."
-                        />
-                    )}
+                    <RequestList
+                        title={activeListTab === 'all' ? "All Requests" : activeListTab === 'failed' ? "Failed Requests" : activeListTab === 'slow' ? "Slow Requests" : "OK Requests"}
+                        requests={processedRequests}
+                        type={activeListTab === 'all' ? 'all' : activeListTab === 'failed' ? 'error' : activeListTab === 'slow' ? 'warning' : 'success'}
+                        emptyMessage={debouncedQuery ? "No matches found." : "No requests found."}
+                        highlight={debouncedQuery}
+                        currentMatch={searchMatches[currentMatchIndex]}
+                    />
                 </div>
             </div>
         </div>
@@ -269,7 +480,16 @@ function StatItem({ label, value, icon, highlight }: { label: string, value: str
     );
 }
 
-function RequestList({ title, requests, type, emptyMessage }: { title: string, requests: ResponseEntrySummary[], type: 'all' | 'error' | 'warning' | 'success', emptyMessage: string }) {
+function RequestList({
+    title, requests, type, emptyMessage, highlight, currentMatch
+}: {
+    title: string,
+    requests: ResponseEntrySummary[],
+    type: 'all' | 'error' | 'warning' | 'success',
+    emptyMessage: string,
+    highlight?: string,
+    currentMatch?: any
+}) {
     const getIcon = () => {
         switch (type) {
             case 'all': return <Layers className="w-5 h-5 text-primary" />;
@@ -296,9 +516,19 @@ function RequestList({ title, requests, type, emptyMessage }: { title: string, r
                     </div>
                 ) : (
                     <div className="divide-y divide-border/50 max-h-[600px] overflow-y-auto custom-scrollbar">
-                        {requests.map((req, i) => (
-                            <RequestItem key={i} req={req} />
-                        ))}
+                        {requests.map((req, i) => {
+                            // Determine if this request has the active match
+                            const isFocused = currentMatch && currentMatch.reqId === i;
+                            return (
+                                <RequestItem
+                                    key={i}
+                                    req={req}
+                                    highlight={highlight}
+                                    isFocused={isFocused ? true : false}
+                                    focusedMatchLocation={isFocused ? currentMatch.location : undefined}
+                                />
+                            );
+                        })}
                     </div>
                 )}
             </div>
@@ -306,9 +536,31 @@ function RequestList({ title, requests, type, emptyMessage }: { title: string, r
     );
 }
 
-function RequestItem({ req }: { req: ResponseEntrySummary }) {
+function RequestItem({ req, highlight, isFocused, focusedMatchLocation }: {
+    req: ResponseEntrySummary,
+    highlight?: string,
+    isFocused?: boolean,
+    focusedMatchLocation?: string
+}) {
     const [isExpanded, setIsExpanded] = useState(false);
     const [activeTab, setActiveTab] = useState<'Headers' | 'Payload' | 'Preview' | 'Response'>('Headers');
+    const itemRef = useRef<HTMLDivElement>(null);
+
+    // Auto-expand and scroll if focused
+    useEffect(() => {
+        if (isFocused) {
+            setIsExpanded(true);
+
+            if (focusedMatchLocation === 'payload') setActiveTab('Payload');
+            else if (focusedMatchLocation === 'response') setActiveTab('Response'); // OR Preview?
+            else if (focusedMatchLocation === 'header') setActiveTab('Headers');
+
+            // Scroll into view
+            if (itemRef.current) {
+                itemRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+    }, [isFocused, focusedMatchLocation]);
 
     // Format date
     const formatDate = (dateString: string) => {
@@ -376,6 +628,12 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
             sections.push('');
         }
 
+        if (req.xCallerCompanyId) {
+            sections.push('## x-caller-company-id');
+            sections.push(req.xCallerCompanyId);
+            sections.push('');
+        }
+
         sections.push('## Payload (Request Body)');
         if (req.requestBody) {
             try {
@@ -403,9 +661,11 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
 
     return (
         <div
+            ref={itemRef}
             className={cn(
                 "transition-all border-b border-border/50 last:border-0",
-                isExpanded ? "bg-muted/30" : "hover:bg-muted/30"
+                isExpanded ? "bg-muted/30" : "hover:bg-muted/30",
+                isFocused && "bg-primary/5 ring-1 ring-primary/20"
             )}
         >
             {/* Header - Always visible and consistent */}
@@ -423,7 +683,7 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
                         req.method === 'DELETE' && "bg-red-500/10 text-red-500",
                         req.method === 'PATCH' && "bg-orange-500/10 text-orange-500",
                     )}>
-                        {req.method}
+                        <HighlightText text={req.method} highlight={highlight || ""} />
                     </span>
 
                     {/* Status and Text */}
@@ -432,10 +692,10 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
                             "text-xs font-bold px-2 py-1 rounded-full shrink-0",
                             req.status >= 400 ? "bg-destructive/10 text-destructive" : "bg-green-500/10 text-green-500"
                         )}>
-                            {req.status}
+                            <HighlightText text={req.status.toString()} highlight={highlight || ""} />
                         </span>
                         <span className="text-sm text-muted-foreground truncate font-medium">
-                            {req.statusText || (req.status >= 400 ? "Error" : "OK")}
+                            <HighlightText text={req.statusText || (req.status >= 400 ? "Error" : "OK")} highlight={highlight || ""} />
                         </span>
                     </div>
                 </div>
@@ -493,7 +753,9 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
                             <div className="space-y-4">
                                 <div className="grid grid-cols-[120px_1fr] gap-2 text-sm items-baseline">
                                     <div className="font-semibold text-muted-foreground">Request URL</div>
-                                    <div className="font-mono text-xs break-all select-all">{req.url}</div>
+                                    <div className="font-mono text-xs break-all select-all">
+                                        <HighlightText text={req.url} highlight={highlight || ""} />
+                                    </div>
 
                                     <div className="font-semibold text-muted-foreground">Request Method</div>
                                     <div className="font-mono text-xs text-foreground">{req.method}</div>
@@ -512,12 +774,57 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
 
                                     <div className="font-semibold text-muted-foreground">x-trace-id</div>
                                     <div className="font-mono text-xs select-all">
-                                        {req.xTraceId || <span className="text-muted-foreground italic">not available</span>}
+                                        {req.xTraceId ? (
+                                            <HighlightText text={req.xTraceId} highlight={highlight || ""} />
+                                        ) : <span className="text-muted-foreground italic">not available</span>}
                                     </div>
                                     {req.externalTraceId && (
                                         <>
                                             <div className="font-semibold text-muted-foreground">external-trace-id</div>
-                                            <div className="font-mono text-xs select-all">{req.externalTraceId}</div>
+                                            <div className="font-mono text-xs select-all">
+                                                <HighlightText text={req.externalTraceId} highlight={highlight || ""} />
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div className="font-semibold text-muted-foreground">x-caller-company-id</div>
+                                    <div className="font-mono text-xs select-all">
+                                        {req.xCallerCompanyId ? (
+                                            <HighlightText text={req.xCallerCompanyId} highlight={highlight || ""} />
+                                        ) : <span className="text-muted-foreground italic">not available</span>}
+                                    </div>
+
+                                    {/* Request Headers */}
+                                    {req.requestHeaders && req.requestHeaders.length > 0 && (
+                                        <>
+                                            <div className="col-span-2 pt-2 pb-1 border-b border-border/30 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Request Headers</div>
+                                            {req.requestHeaders.map((h) => (
+                                                <>
+                                                    <div className="font-semibold text-muted-foreground pl-2 truncate" title={h.name}>
+                                                        <HighlightText text={h.name} highlight={highlight || ""} />
+                                                    </div>
+                                                    <div className="font-mono text-xs break-all text-muted-foreground/80">
+                                                        <HighlightText text={h.value} highlight={highlight || ""} />
+                                                    </div>
+                                                </>
+                                            ))}
+                                        </>
+                                    )}
+
+                                    {/* Response Headers */}
+                                    {req.responseHeaders && req.responseHeaders.length > 0 && (
+                                        <>
+                                            <div className="col-span-2 pt-2 pb-1 border-b border-border/30 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Response Headers</div>
+                                            {req.responseHeaders.map((h) => (
+                                                <>
+                                                    <div className="font-semibold text-muted-foreground pl-2 truncate" title={h.name}>
+                                                        <HighlightText text={h.name} highlight={highlight || ""} />
+                                                    </div>
+                                                    <div className="font-mono text-xs break-all text-muted-foreground/80">
+                                                        <HighlightText text={h.value} highlight={highlight || ""} />
+                                                    </div>
+                                                </>
+                                            ))}
                                         </>
                                     )}
                                 </div>
@@ -530,9 +837,9 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
                                     if (!req.requestBody) return <span className="text-muted-foreground italic">No payload data available.</span>;
                                     try {
                                         const json = JSON.parse(req.requestBody);
-                                        return <JsonViewer data={json} initialExpanded={true} />;
+                                        return <JsonViewer data={json} initialExpanded={true} highlight={highlight} />;
                                     } catch (e) {
-                                        return req.requestBody;
+                                        return <HighlightText text={req.requestBody} highlight={highlight || ""} />;
                                     }
                                 })()}
                             </div>
@@ -544,9 +851,9 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
                                     if (!req.responseBody) return <span className="text-muted-foreground italic">Preview not available.</span>;
                                     try {
                                         const json = JSON.parse(req.responseBody);
-                                        return <JsonViewer data={json} initialExpanded={true} />;
+                                        return <JsonViewer data={json} initialExpanded={true} highlight={highlight} />;
                                     } catch (e) {
-                                        return req.responseBody;
+                                        return <HighlightText text={req.responseBody} highlight={highlight || ""} />;
                                     }
                                 })()}
                             </div>
@@ -554,7 +861,16 @@ function RequestItem({ req }: { req: ResponseEntrySummary }) {
 
                         {activeTab === 'Response' && (
                             <div className="text-sm font-mono whitespace-pre-wrap break-all max-h-[400px] overflow-y-auto custom-scrollbar p-2">
-                                {req.responseBody ? req.responseBody : (
+                                {req.responseBody ? (
+                                    (() => {
+                                        try {
+                                            const json = JSON.parse(req.responseBody);
+                                            return <JsonViewer data={json} initialExpanded={true} highlight={highlight} />;
+                                        } catch {
+                                            return <HighlightText text={req.responseBody} highlight={highlight || ""} />;
+                                        }
+                                    })()
+                                ) : (
                                     <span className="text-muted-foreground italic">Response body not available.</span>
                                 )}
                             </div>

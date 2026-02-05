@@ -69,14 +69,33 @@ public class HarHandler {
 
                 String xTraceId = "";
                 String externalTraceId = "";
+                String xCallerCompanyId = "";
+                List<com.haranalyzer.backend.model.Header> responseHeaderList = new ArrayList<>();
                 JsonNode headers = response.path("headers");
                 if (headers.isArray()) {
                     for (JsonNode header : headers) {
                         String headerName = header.path("name").asText("");
+                        String headerValue = header.path("value").asText("");
+                        responseHeaderList.add(new com.haranalyzer.backend.model.Header(headerName, headerValue));
+
                         if ("x-trace-id".equalsIgnoreCase(headerName)) {
-                            xTraceId = header.path("value").asText("");
+                            xTraceId = headerValue;
                         } else if ("external-trace-id".equalsIgnoreCase(headerName)) {
-                            externalTraceId = header.path("value").asText("");
+                            externalTraceId = headerValue;
+                        }
+                    }
+                }
+
+                List<com.haranalyzer.backend.model.Header> requestHeaderList = new ArrayList<>();
+                JsonNode requestHeaders = request.path("headers");
+                if (requestHeaders.isArray()) {
+                    for (JsonNode header : requestHeaders) {
+                        String headerName = header.path("name").asText("");
+                        String headerValue = header.path("value").asText("");
+                        requestHeaderList.add(new com.haranalyzer.backend.model.Header(headerName, headerValue));
+
+                        if ("x-caller-company-id".equalsIgnoreCase(headerName)) {
+                            xCallerCompanyId = headerValue;
                         }
                     }
                 }
@@ -85,7 +104,8 @@ public class HarHandler {
                 String responseBody = response.path("content").path("text").asText("");
 
                 ResponseEntrySummary summary = new ResponseEntrySummary(method, url, status, statusText, time, size,
-                        startedDateTime, xTraceId, externalTraceId, requestBody, responseBody);
+                        startedDateTime, xTraceId, externalTraceId, requestBody, responseBody, xCallerCompanyId,
+                        requestHeaderList, responseHeaderList);
 
                 if (status >= ERROR_STATUS_THRESHOLD) {
                     failedRequests++;

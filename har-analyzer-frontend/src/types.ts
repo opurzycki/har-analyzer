@@ -8,8 +8,11 @@ export interface ResponseEntrySummary {
     startedDateTime: string;
     xTraceId: string;
     externalTraceId: string;
+    xCallerCompanyId: string;
     requestBody?: string;
     responseBody?: string;
+    requestHeaders: { name: string; value: string }[];
+    responseHeaders: { name: string; value: string }[];
 }
 
 export interface AnalysisResult {

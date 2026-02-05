@@ -142,7 +142,7 @@ export function FileUpload({ onAnalysisComplete }: FileUploadProps) {
                 </div>
                 <input
                     type="file"
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-50"
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed z-20"
                     accept=".har"
                     onChange={handleFileChange}
                     disabled={isUploading}
