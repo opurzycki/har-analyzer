@@ -12,12 +12,14 @@ import {
     ChevronUp,
     ChevronDown,
     MessageCircleQuestion,
-    Search
+    Search,
+    X
 } from "lucide-react";
 import type { AnalysisResult, ResponseEntrySummary } from "../types";
 import { cn } from "../lib/utils";
 import { JsonViewer } from "./JsonViewer";
 import { HighlightText } from "./HighlightText";
+
 import { useEffect, useRef } from "react";
 
 interface AnalysisDashboardProps {
@@ -100,99 +102,50 @@ export function AnalysisDashboard({ result, onReset }: AnalysisDashboardProps) {
         return matches;
     };
 
-    // Filter requests and calculate matches
+    // Filter requests based on active tab and search query
     const filteredRequests = useMemo(() => {
+        // 1. Determine Source List based on Active Tab
+        let sourceList: ResponseEntrySummary[] = allRequests;
+        if (activeListTab === 'failed') sourceList = result.failedRequestsList;
+        else if (activeListTab === 'slow') sourceList = result.slowRequestsList;
+        else if (activeListTab === 'success') sourceList = result.successRequestsList || [];
+
         if (!debouncedQuery) {
-            setSearchMatches([]);
-            setCurrentMatchIndex(-1);
-            return allRequests;
+            return sourceList;
         }
 
         const query = debouncedQuery.toLowerCase();
-        let newMatches: SearchMatch[] = [];
 
-        const filtered = allRequests.filter((req, index) => {
-            let hasMatch = false;
-            const reqId = index;
-
+        return sourceList.filter((req) => {
             // Simple fields
-            if (req.url.toLowerCase().includes(query)) {
-                newMatches.push({ reqId, location: 'url', value: req.url });
-                hasMatch = true;
-            }
-            if (req.method.toLowerCase().includes(query)) {
-                newMatches.push({ reqId, location: 'method', value: req.method });
-                hasMatch = true;
-            }
-            if (req.status.toString().includes(query) || (req.statusText && req.statusText.toLowerCase().includes(query))) {
-                newMatches.push({ reqId, location: 'status', value: `${req.status} ${req.statusText}` });
-                hasMatch = true;
-            }
-            if (req.xTraceId && req.xTraceId.toLowerCase().includes(query)) {
-                newMatches.push({ reqId, location: 'trace', value: req.xTraceId });
-                hasMatch = true;
-            }
+            if (req.url.toLowerCase().includes(query)) return true;
+            if (req.method.toLowerCase().includes(query)) return true;
+            if (req.status.toString().includes(query) || (req.statusText && req.statusText.toLowerCase().includes(query))) return true;
+            if (req.xTraceId && req.xTraceId.toLowerCase().includes(query)) return true;
+
             // Headers
-            if (req.requestHeaders) {
-                req.requestHeaders.forEach(h => {
-                    if (h.name.toLowerCase().includes(query) || h.value.toLowerCase().includes(query)) {
-                        newMatches.push({ reqId, location: 'header', path: h.name, value: h.value });
-                        hasMatch = true;
-                    }
-                });
-            }
-            if (req.responseHeaders) {
-                req.responseHeaders.forEach(h => {
-                    if (h.name.toLowerCase().includes(query) || h.value.toLowerCase().includes(query)) {
-                        newMatches.push({ reqId, location: 'header', path: h.name, value: h.value });
-                        hasMatch = true;
-                    }
-                });
-            }
+            if (req.requestHeaders?.some(h => h.name.toLowerCase().includes(query) || h.value.toLowerCase().includes(query))) return true;
+            if (req.responseHeaders?.some(h => h.name.toLowerCase().includes(query) || h.value.toLowerCase().includes(query))) return true;
 
-            // JSON Bodies
-            if (req.requestBody) {
+            // JSON Bodies - Check if content matches
+            const checkBody = (body: string | undefined) => {
+                if (!body) return false;
                 try {
-                    const json = JSON.parse(req.requestBody);
+                    const json = JSON.parse(body);
                     const jsonMatches = findMatchesInJson(json);
-                    if (jsonMatches.length > 0) {
-                        jsonMatches.forEach(m => newMatches.push({ reqId, location: 'payload', path: m.path, value: m.value }));
-                        hasMatch = true;
-                    }
+                    if (jsonMatches.length > 0) return true;
                 } catch {
-                    if (req.requestBody.toLowerCase().includes(query)) {
-                        newMatches.push({ reqId, location: 'payload', value: req.requestBody });
-                        hasMatch = true;
-                    }
+                    if (body.toLowerCase().includes(query)) return true;
                 }
-            }
-            if (req.responseBody) {
-                try {
-                    const json = JSON.parse(req.responseBody);
-                    const jsonMatches = findMatchesInJson(json);
-                    if (jsonMatches.length > 0) {
-                        jsonMatches.forEach(m => newMatches.push({ reqId, location: 'response', path: m.path, value: m.value }));
-                        hasMatch = true;
-                    }
-                } catch {
-                    if (req.responseBody.toLowerCase().includes(query)) {
-                        newMatches.push({ reqId, location: 'response', value: req.responseBody });
-                        hasMatch = true;
-                    }
-                }
-            }
+                return false;
+            };
 
-            return hasMatch;
+            if (checkBody(req.requestBody)) return true;
+            if (checkBody(req.responseBody)) return true;
+
+            return false;
         });
-
-        // Map original indices to filtered indices for matches if we were strictly filtering logic
-        // But here we are filtering ALL requests then showing matches valid for the visible set.
-        // Actually, if we filter the list, the matches indices must align with the FILTERED list.
-        // Let's re-run match finding on just the filtered list to keep indices aligned simpler.
-
-        // Revised approach: First filter, then find matches on the filtered set.
-        return filtered;
-    }, [debouncedQuery, allRequests]);
+    }, [debouncedQuery, allRequests, activeListTab, result]);
 
     const sortRequests = (requests: ResponseEntrySummary[]) => {
         return [...requests].sort((a, b) => {
@@ -330,8 +283,16 @@ export function AnalysisDashboard({ result, onReset }: AnalysisDashboardProps) {
                         placeholder="Search requests..."
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full pl-9 pr-4 py-2 rounded-lg border bg-card/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
+                        className="w-full pl-9 pr-8 py-2 rounded-lg border bg-card/50 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-primary/20 transition-all placeholder:text-muted-foreground/50"
                     />
+                    {searchQuery && (
+                        <button
+                            onClick={() => setSearchQuery("")}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors p-0.5 rounded-full hover:bg-muted"
+                        >
+                            <X className="w-3 h-3" />
+                        </button>
+                    )}
                 </div>
 
                 {searchMatches.length > 0 && (
@@ -793,40 +754,6 @@ function RequestItem({ req, highlight, isFocused, focusedMatchLocation }: {
                                             <HighlightText text={req.xCallerCompanyId} highlight={highlight || ""} />
                                         ) : <span className="text-muted-foreground italic">not available</span>}
                                     </div>
-
-                                    {/* Request Headers */}
-                                    {req.requestHeaders && req.requestHeaders.length > 0 && (
-                                        <>
-                                            <div className="col-span-2 pt-2 pb-1 border-b border-border/30 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Request Headers</div>
-                                            {req.requestHeaders.map((h) => (
-                                                <>
-                                                    <div className="font-semibold text-muted-foreground pl-2 truncate" title={h.name}>
-                                                        <HighlightText text={h.name} highlight={highlight || ""} />
-                                                    </div>
-                                                    <div className="font-mono text-xs break-all text-muted-foreground/80">
-                                                        <HighlightText text={h.value} highlight={highlight || ""} />
-                                                    </div>
-                                                </>
-                                            ))}
-                                        </>
-                                    )}
-
-                                    {/* Response Headers */}
-                                    {req.responseHeaders && req.responseHeaders.length > 0 && (
-                                        <>
-                                            <div className="col-span-2 pt-2 pb-1 border-b border-border/30 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Response Headers</div>
-                                            {req.responseHeaders.map((h) => (
-                                                <>
-                                                    <div className="font-semibold text-muted-foreground pl-2 truncate" title={h.name}>
-                                                        <HighlightText text={h.name} highlight={highlight || ""} />
-                                                    </div>
-                                                    <div className="font-mono text-xs break-all text-muted-foreground/80">
-                                                        <HighlightText text={h.value} highlight={highlight || ""} />
-                                                    </div>
-                                                </>
-                                            ))}
-                                        </>
-                                    )}
                                 </div>
                             </div>
                         )}
