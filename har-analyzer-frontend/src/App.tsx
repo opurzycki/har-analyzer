@@ -18,7 +18,7 @@ function App() {
             <div className="p-2 bg-primary/10 rounded-lg">
               <Activity className="w-6 h-6 text-primary" />
             </div>
-            <span className="font-bold text-xl tracking-tight">HAR Analyzer</span>
+            <span className="font-bold text-xl tracking-tight">SmartHAR</span>
           </div>
           <nav className="flex items-center gap-4 text-sm font-medium text-muted-foreground">
             <JiraTemplateModal />
@@ -55,7 +55,7 @@ function App() {
       {/* Footer */}
       <footer className="border-t border-border/40 py-8 mt-auto">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
-          <p>&copy; 2025 HAR Analyzer.</p>
+          <p>&copy; {new Date().getFullYear()} SmartHAR by Olaf Purzycki</p>
         </div>
       </footer>
     </div>
