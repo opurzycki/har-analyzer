@@ -12,6 +12,7 @@ import {
     ChevronUp,
     ChevronDown,
     MessageCircleQuestion,
+    ExternalLink,
     Search,
     X
 } from "lucide-react";
@@ -620,6 +621,56 @@ function RequestItem({ req, highlight, isFocused, focusedMatchLocation }: {
         window.open(gleanUrl, '_blank');
     };
 
+    // Build Kibana URL from trace IDs and request time
+    const buildKibanaUrl = (): string | null => {
+        // Resolve trace ID by priority: x-trace-id > external-trace-id > x-caller-company-id
+        let fieldName = '';
+        let fieldValue = '';
+
+        if (req.xTraceId) {
+            fieldName = 'x_trace_id';
+            fieldValue = req.xTraceId;
+        } else if (req.externalTraceId) {
+            fieldName = 'external_trace_id';
+            fieldValue = req.externalTraceId;
+        } else if (req.xCallerCompanyId) {
+            fieldName = 'x_caller_company_id';
+            fieldValue = req.xCallerCompanyId;
+        } else {
+            return null; // No trace ID available
+        }
+
+        // Calculate time range: ±2 hours, rounded to 30-min blocks
+        const requestTime = new Date(req.startedDateTime);
+
+        // From: subtract 2 hours, floor to nearest 30 min
+        const fromTime = new Date(requestTime.getTime() - 2 * 60 * 60 * 1000);
+        fromTime.setUTCMinutes(Math.floor(fromTime.getUTCMinutes() / 30) * 30, 0, 0);
+
+        // To: add 2 hours, ceil to nearest 30 min
+        const toTime = new Date(requestTime.getTime() + 2 * 60 * 60 * 1000);
+        const toMinutes = toTime.getUTCMinutes();
+        if (toMinutes % 30 !== 0) {
+            toTime.setUTCMinutes(Math.ceil(toMinutes / 30) * 30, 0, 0);
+        } else {
+            toTime.setUTCSeconds(0, 0);
+        }
+
+        const fromISO = fromTime.toISOString().replace('.000Z', '.000Z');
+        const toISO = toTime.toISOString().replace('.000Z', '.000Z');
+
+        return `https://kibana.glob-prod-fran.internal.srtools.net/app/discover#/?_g=(filters:!(),refreshInterval:(pause:!t,value:60000),time:(from:'${fromISO}',to:'${toISO}'))&_a=(columns:!(response,context,raw_request,x_endpoint_path,x_caller_company_id,external_trace_id),interval:auto,query:(language:kuery,query:'${fieldName}:${fieldValue}'),sort:!(!('@timestamp',desc)))`;
+    };
+
+    // Handle Check Kibana button click
+    const handleCheckKibana = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        const url = buildKibanaUrl();
+        if (url) {
+            window.open(url, '_blank');
+        }
+    };
+
     return (
         <div
             ref={itemRef}
@@ -661,8 +712,22 @@ function RequestItem({ req, highlight, isFocused, focusedMatchLocation }: {
                     </div>
                 </div>
 
-                {/* Ask Glean button, Time, and Chevron */}
+                {/* Action buttons, Time, and Chevron */}
                 <div className="flex items-center gap-3 shrink-0">
+                    {/* Check Kibana Button - For all requests with a trace ID */}
+                    {buildKibanaUrl() && (
+                        <>
+                            <button
+                                onClick={handleCheckKibana}
+                                className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-md bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+                                title="Check Kibana logs for this request"
+                            >
+                                <ExternalLink className="w-3.5 h-3.5" />
+                                <span className="hidden sm:inline">Check Kibana</span>
+                            </button>
+                            <span className="w-px h-3 bg-border" />
+                        </>
+                    )}
                     {/* Ask Glean Button - Only for failed requests */}
                     {req.status >= 400 && (
                         <>
